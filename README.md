@@ -10,3 +10,5 @@ to the given queries.
 * You should implement the retrieval system by Vector
 Space Model (VSM) with Rocchio Relevance
 Feedback (pseudo version). 
+# Usage:
+![](https://github.com/kevinisbest/Web-Retrieval-and-Mining-VSM/blob/master/images/synopsis.png)
