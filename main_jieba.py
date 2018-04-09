@@ -13,14 +13,14 @@ import xml.etree.cElementTree as ET
 # jieba.set_dictionary('dict.txt.big')
 
 #Okipi/BM25 Parmeters
-BM25_K = 2
-SLOPE = 0.6
+BM25_K = 2.2
+SLOPE = 0.58
 
 #Rocchio Relevance Feedback parameters
-ALPHA = 0.90
-BETA = 0.20
-GAMMA = 0.10
-RELATED_RATIO = 0.2
+ALPHA = 1
+BETA = 0.75
+GAMMA = 0.15
+RELATED_RATIO = 0.3
 
 global OUTPUTFILE
 OUTPUTFILE = 'S_' + str(SLOPE) + 'A_' + str(ALPHA) + 'B_' + str(BETA) + 'C_' + str(GAMMA)+'_Jieba'
@@ -134,7 +134,7 @@ def read_in_chunks(filePath, chunk_size=1024*1024):
 			break
 		yield chunk_data
 
-def Query(query, Feedback, OutputFile):
+def Query(query, Feedback, OutputFile, IsJieba):
 	Text = "query_id,retrieved_docs\n"
 	with open(query) as f:
 		# print(query)
@@ -153,34 +153,53 @@ def Query(query, Feedback, OutputFile):
 
 			queryTermsDict = {}
 			for term in concepts.split(u'、'):
-				term = jieba.cut(term, cut_all=False)
-				for item in term:
-					if len(item) % 2 == 0: # if length of term is even, sliding windows shift distance 2
-						for i in range(0,len(item),2):
-							try:
-								queryTermsDict[item[i]+item[i+1]]
-							except:
-								# first
-								queryTermsDict[item[i]+item[i+1]]=1
-							else:
-								queryTermsDict[item[i]+item[i+1]]+=1
-					else:
-						if len(item)== 3: # trigram
-							try:
-								queryTermsDict[item[0]+item[1]+item[2]]
-							except:
-								queryTermsDict[item[0]+item[1]+item[2]]=1
-							else:
-								queryTermsDict[item[0]+item[1]+item[2]]+=1
-
-						else: # if length of term is odd, sliding windows shift dictance 1
-							for i in range(0,len(item)-1):
+				if IsJieba :
+					term = jieba.cut(term, cut_all=False)
+					for item in term:
+						if len(item) % 2 == 0: # if length of term is even, sliding windows shift distance 2
+							for i in range(0,len(item),2):
 								try:
 									queryTermsDict[item[i]+item[i+1]]
 								except:
+									# first
 									queryTermsDict[item[i]+item[i+1]]=1
 								else:
 									queryTermsDict[item[i]+item[i+1]]+=1
+						else:
+							if len(item)== 3: # trigram
+								try:
+									queryTermsDict[item[0]+item[1]+item[2]]
+								except:
+									queryTermsDict[item[0]+item[1]+item[2]]=1
+								else:
+									queryTermsDict[item[0]+item[1]+item[2]]+=1
+
+							else: # if length of term is odd, sliding windows shift dictance 1
+								for i in range(0,len(item)-1):
+									try:
+										queryTermsDict[item[i]+item[i+1]]
+									except:
+										queryTermsDict[item[i]+item[i+1]]=1
+									else:
+										queryTermsDict[item[i]+item[i+1]]+=1
+				else:
+					if len(term) % 2 == 0: # if length of term is even, sliding windows shift distance 2
+						for i in range(0,len(term),2):
+							try:
+								queryTermsDict[term[i]+term[i+1]]
+							except:
+								# first 
+								queryTermsDict[term[i]+term[i+1]]=1
+							else:
+								queryTermsDict[term[i]+term[i+1]]+=1
+					else: # if length of term is odd, sliding windows shift dictance 1
+						for i in range(0,len(term)-1):
+							try:
+								queryTermsDict[term[i]+term[i+1]]
+							except:
+								queryTermsDict[term[i]+term[i+1]]=1
+							else:
+								queryTermsDict[term[i]+term[i+1]]+=1
 			# print(queryTermsDict)
 			# Bigram(queryTermsDict, query_id, Feedback)
 			Text += Bigram(queryTermsDict, query_id, Feedback)
@@ -362,12 +381,14 @@ def Rocchio_Relevance_Feedback(queryVector, rankingDict):
 	# Counting Related Docs
 	RelatedSum = np.array([0] * len(queryVector))
 	for docid in Score_Dict[ 0:RelevanceCount ]:
-		RelatedSum += np.array(rankingDict[docid[0]])
+		RelatedSum = np.add(RelatedSum, np.array(rankingDict[docid[0]]),out=RelatedSum, casting="unsafe")
+		# RelatedSum += np.array(rankingDict[docid[0]])
 
 	# Counting Non-related Docs
 	NonRealtedSum = np.array([0] * len(queryVector))
 	for docid in Score_Dict[ -RelevanceCount: ]:
-		NonRealtedSum += np.array(rankingDict[docid[0]])
+		NonRealtedSum = np.add(NonRealtedSum, np.array(rankingDict[docid[0]]), out = NonRealtedSum, casting="unsafe")
+		# NonRealtedSum += np.array(rankingDict[docid[0]])
 
 	Origial = np.array(queryVector)
 	RelatedSum = np.array(RelatedSum)
@@ -416,7 +437,7 @@ def Cut_By_Jieba():
 
 		textInDoc = list(jieba.cut(textInDoc))
 
-		puncs = [u'，', u'?', u'@', u'!', u'$', u'%', u'『', u'』', u'「', u'」', u'＼', u'｜', u'？', u' ', u'*', u'(', u')', u'~', u'.', u'[', u']', 'u\n',u'1',u'2',u'3',u'4',u'5',u'6',u'7',u'8',u'9',u'0', u'。']
+		puncs = [u'、', u'，', u'?', u'@', u'!', u'$', u'%', u'『', u'』', u'「', u'」', u'＼', u'｜', u'？', u' ', u'*', u'(', u')', u'~', u'.', u'[', u']', 'u\n',u'1',u'2',u'3',u'4',u'5',u'6',u'7',u'8',u'9',u'0', u'。']
 
 		for item in textInDoc:
 			if item in puncs:
@@ -471,7 +492,7 @@ def main():
 	global File_List, Avg_Doc_Len, InvertedFile_Dict, Vocab_List
 
 	if(args.r):
-		OUTPUTFILE = OUTPUTFILE + 'R_' + str(RELATED_RATIO)
+		OUTPUTFILE = 'S_' + str(SLOPE) + 'A_' + str(ALPHA) + 'B_' + str(BETA) + 'C_' + str(GAMMA)+'_Jieba' + 'R_' + str(RELATED_RATIO)
 
 	if(args.o):
 		OUTPUTFILE = str(args.o)
@@ -481,8 +502,8 @@ def main():
 	InvertedFile_Dict = Read_InvertedList(args.m)
 
 	if(args.b):
-		Cut_By_Jieba() # trigram or above
-	Query(args.i, args.r, args.o)
+		Cut_By_Jieba() # trigram 
+	Query(args.i, args.r, args.o, args.b)
 
 if __name__ == '__main__':
 	main()

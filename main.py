@@ -150,7 +150,7 @@ def Query(query, Feedback, OutputFile):
 			puncs = [u'，', u'?', u'@', u'!', u'$', u'%', u'『', u'』', u'「', u'」', u'＼', u'｜', u'？', u' ', u'*', u'(', u')', u'~', u'.', u'[', u']', 'u\n',u'1',u'2',u'3',u'4',u'5',u'6',u'7',u'8',u'9',u'0', u'。']
 			for punc in puncs:
 				concepts = concepts.replace(punc,'')
-			print(type(concepts))
+			# print(type(concepts))
 			queryTermsDict = {}
 			for term in concepts.split(u'、'):
 				if len(term) % 2 == 0: # if length of term is even, sliding windows shift distance 2
@@ -278,7 +278,7 @@ def Bigram(queryTermsDict, query_id, Feedback):
 def Rocchio_Relevance_Feedback(queryVector, rankingList):
 	print('Rocchio Relevance Feedback...')
 	rankListLength = len(rankingList)
-	RelevanceCount = int(rankListLength * RELATED_RATIO) # assume RELATED_RATIO% docs is related 
+	RelevanceCount = int(rankListLength * RELATED_RATIO) # assume RELATED_RATIO % docs is related 
 	NonRelevanceCount = int(rankListLength * (1 - RELATED_RATIO))
 
 	Score_Dict = {}
