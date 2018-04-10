@@ -14,7 +14,7 @@ import xml.etree.cElementTree as ET
 
 #Okipi/BM25 Parmeters
 BM25_K = 2
-SLOPE = 0.58
+SLOPE = 0.6
 
 #Rocchio Relevance Feedback parameters
 ALPHA = 0.9
@@ -186,27 +186,21 @@ def Bigram(queryTermsDict, query_id, Feedback):
 	queryTermsIndex = 0
 	for key, value in queryTermsDict.items():
 		print(key,value)
-		if key[0] in Vocab_List:
-			if key[1] in Vocab_List: #bigram
-
+		if key[0].encode('utf-8') in Vocab_List:
+			if key[1].encode('utf-8') in Vocab_List: #bigram
 				# print(key[0]+key[1]+'in Vocab_List')
-				Inverted_Index = str(Vocab_List.index(key[0]))+','+str(Vocab_List.index(key[1])) # find out the bigram term index
-
+				Inverted_Index = str(Vocab_List.index(key[0].encode('utf-8')))+','+str(Vocab_List.index(key[1].encode('utf-8'))) # find out the bigram term index
 				# print('Inverted Index:' + Inverted_Index)
-
 				if Inverted_Index in InvertedFile_Dict:
 					# Use Okapi/BM25 to normalize Document Length
-
 					queryVector.append(value) # queryVector
 					BigramInDoc = InvertedFile_Dict[Inverted_Index]
 					doc_freq = int(BigramInDoc['Doc_Freq'])
 					Docs = BigramInDoc['Docs']
-
 					# Formula: IDF(w) = log(m+1/k)
 					# m – total number of docs
 					# k – numbers of docs with term t (doc freq)
 					IDF = math.log( (len(File_List)+1) / doc_freq)
-
 					for doc in Docs:
 						docID = int(doc['docID'])
 						countindoc = int(doc['countInDoc'])
@@ -217,7 +211,7 @@ def Bigram(queryTermsDict, query_id, Feedback):
 						rankingList[docID][queryTermsIndex] = float(Bigram_TF * IDF * value)
 					queryTermsIndex += 1
 			else: # unigram
-				Inverted_Index = str(Vocab_List.index(key[0]))+',-1' # find out the unigram term index
+				Inverted_Index = str(Vocab_List.index(key[0].encode('utf-8')))+',-1' # find out the unigram term index
 
 				if Inverted_Index in InvertedFile_Dict:
 					queryVector.append(value) # queryVector
@@ -237,8 +231,8 @@ def Bigram(queryTermsDict, query_id, Feedback):
 						rankingList[docID][queryTermsIndex] = float(Bigram_TF * IDF * value)
 					queryTermsIndex += 1
 		else: # unigram
-			if key[1] in Vocab_List:
-				Inverted_Index = str(Vocab_List.index(key[1]))+',-1' # find out the unigram term index
+			if key[1].encode('utf-8') in Vocab_List:
+				Inverted_Index = str(Vocab_List.index(key[1].encode('utf-8')))+',-1' # find out the unigram term index
 
 				if Inverted_Index in InvertedFile_Dict:
 					queryVector.append(value) # queryVector
@@ -282,26 +276,28 @@ def Rocchio_Relevance_Feedback(queryVector, rankingList):
 	NonRelevanceCount = int(rankListLength * (1 - RELATED_RATIO))
 
 	Score_Dict = {}
-
+	useToSum = rankingList
 	for docid in rankingList:
-		Score_Dict[docid] = sum(rankingList[docid])
+		Score_Dict[docid] = sum(useToSum[docid])
 	Score_Dict = list(sorted(Score_Dict.items(), key = itemgetter(1), reverse = True))
 
 	# Counting Related Docs
 	RelatedSum = np.array([0] * len(queryVector))
-	for docid in Score_Dict[ 0:RelevanceCount ]:
-		RelatedSum += np.array(rankingList[docid[0]])
+	for docid in Score_Dict[ :RelevanceCount ]:
+		# RelatedSum = np.add(RelatedSum, np.array(rankingList[docid[0]]),out=RelatedSum, casting="unsafe")
+		RelatedSum =RelatedSum+ np.array(rankingList[docid[0]])
 
 	# Counting Non-related Docs
 	NonRealtedSum = np.array([0] * len(queryVector))
 	for docid in Score_Dict[ -RelevanceCount: ]:
-		NonRealtedSum += np.array(rankingList[docid[0]])
+		# NonRealtedSum = np.add(NonRealtedSum, np.array(rankingList[docid[0]]), out = NonRealtedSum, casting="unsafe")
+		NonRealtedSum =NonRealtedSum+ np.array(rankingList[docid[0]])
 
 	Origial = np.array(queryVector)
-	RelatedSum = np.array(RelatedSum)
-	NonRealtedSum = np.array(NonRealtedSum)
+	Related = np.array(RelatedSum)
+	NonRealted = np.array(NonRealtedSum)
 
-	NewqueryVector = (ALPHA * Origial) + (BETA*RelatedSum/RelevanceCount) - (GAMMA*NonRealtedSum/NonRelevanceCount)
+	NewqueryVector = (ALPHA * Origial) + (BETA*Related/RelevanceCount) - (GAMMA*NonRealted/NonRelevanceCount)
 
 	return NewqueryVector
 
@@ -331,7 +327,7 @@ def Score_N_Sort(queryVector, rankingList):
 
 def main():
 	parser = ArgumentParser()
-	parser.add_argument('-r', help = " if specified, turn on relevance feedback", type = bool, default = False)
+	parser.add_argument('-r', help = " if specified, turn on relevance feedback", action="store_true", default = False)
 	parser.add_argument('-i', help = " query-file", type=str)
 	parser.add_argument('-o', help = " output ranked list : *.csv", type=str)
 	parser.add_argument('-m', help = " model-dir", type=str)
@@ -341,7 +337,7 @@ def main():
 	global File_List, Avg_Doc_Len, InvertedFile_Dict, Vocab_List
 
 	if(args.r):
-		OUTPUTFILE = OUTPUTFILE + 'R_' + str(RELATED_RATIO)
+		OUTPUTFILE = 'S_' + str(SLOPE) + 'A_' + str(ALPHA) + 'B_' + str(BETA) + 'C_' + str(GAMMA) + 'R_' + str(RELATED_RATIO)
 
 	if(args.o):
 		OUTPUTFILE = str(args.o)

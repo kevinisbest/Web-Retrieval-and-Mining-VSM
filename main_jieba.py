@@ -20,7 +20,7 @@ SLOPE = 0.58
 ALPHA = 1
 BETA = 0.75
 GAMMA = 0.15
-RELATED_RATIO = 0.3
+RELATED_RATIO = 0.2
 
 global OUTPUTFILE
 OUTPUTFILE = 'S_' + str(SLOPE) + 'A_' + str(ALPHA) + 'B_' + str(BETA) + 'C_' + str(GAMMA)+'_Jieba'
@@ -173,7 +173,6 @@ def Query(query, Feedback, OutputFile, IsJieba):
 									queryTermsDict[item[0]+item[1]+item[2]]=1
 								else:
 									queryTermsDict[item[0]+item[1]+item[2]]+=1
-
 							else: # if length of term is odd, sliding windows shift dictance 1
 								for i in range(0,len(item)-1):
 									try:
@@ -188,18 +187,32 @@ def Query(query, Feedback, OutputFile, IsJieba):
 							try:
 								queryTermsDict[term[i]+term[i+1]]
 							except:
-								# first 
+								# first
 								queryTermsDict[term[i]+term[i+1]]=1
 							else:
 								queryTermsDict[term[i]+term[i+1]]+=1
-					else: # if length of term is odd, sliding windows shift dictance 1
-						for i in range(0,len(term)-1):
+					else:
+						if len(term) ==3:
 							try:
-								queryTermsDict[term[i]+term[i+1]]
-							except:
-								queryTermsDict[term[i]+term[i+1]]=1
+								queryTermsDict[term[0]+term[1]]
+							except :
+								queryTermsDict[term[0]+term[1]]=1
 							else:
-								queryTermsDict[term[i]+term[i+1]]+=1
+								queryTermsDict[term[0]+term[1]]+=1
+							try:
+								queryTermsDict[term[2]]
+							except :
+								queryTermsDict[term[2]]=1
+							else:
+								queryTermsDict[term[2]]+=1
+						else:# if length of term is odd, sliding windows shift dictance 1
+							for i in range(0,len(term)-1):
+								try:
+									queryTermsDict[term[i]+term[i+1]]
+								except:
+									queryTermsDict[term[i]+term[i+1]]=1
+								else:
+									queryTermsDict[term[i]+term[i+1]]+=1
 			# print(queryTermsDict)
 			# Bigram(queryTermsDict, query_id, Feedback)
 			Text += Bigram(queryTermsDict, query_id, Feedback)
@@ -214,21 +227,43 @@ def Bigram(queryTermsDict, query_id, Feedback):
 	queryVector=[]
 	rankingDict = {}
 	queryTermsIndex = 0
-	print('len(queryTermsDict)',len(queryTermsDict))
-	for key, value in queryTermsDict.items():
-
+	print('len(queryTermsDict):',len(queryTermsDict))
+	for key in list(queryTermsDict.keys()):
+		value = queryTermsDict[key]
 		print(key,value)
+		if len(key)==1:
+			if key.encode('utf-8') in Vocab_List:
+				Inverted_Index = str(Vocab_List.index(key.encode('utf-8')))+',-1' # find out the unigram term index
+				if Inverted_Index in InvertedFile_Dict:
+					print('unigram: '+str(Inverted_Index))
+					queryVector.append(value) # queryVector
+					UnigramInDoc = InvertedFile_Dict[Inverted_Index]
+					doc_freq = int(UnigramInDoc['Doc_Freq'])
+					Docs = UnigramInDoc['Docs']
 
-		if len(key)<=2:
+					IDF = math.log( (len(File_List)+1) / doc_freq)
 
-			if key[0] in Vocab_List:
+					for doc in Docs:
+						docID = int(doc['docID'])
+						countindoc = int(doc['countInDoc'])
+						Bigram_TF = ( BM25_K + 1 ) * countindoc / ( countindoc + BM25_K * ( 1 - SLOPE + SLOPE * doc_freq / Avg_Doc_Len) )
+						# print(Bigram_TF)
+						if docID not in rankingDict:
+							rankingDict[docID] = [0] * len(queryTermsDict)
+						rankingDict[docID][queryTermsIndex] = float(Bigram_TF * IDF * value)
+					queryTermsIndex += 1
 
-				if key[1] in Vocab_List: #bigram
+		elif len(key)==2:
+
+			if key[0].encode('utf-8') in Vocab_List:
+
+				if key[1].encode('utf-8') in Vocab_List: #bigram
+					print('bigram')
 
 					# print(key[0]+key[1]+'in Vocab_List')
-					Inverted_Index = str(Vocab_List.index(key[0]))+','+str(Vocab_List.index(key[1])) # find out the bigram term index
+					Inverted_Index = str(Vocab_List.index(key[0].encode('utf-8')))+','+str(Vocab_List.index(key[1].encode('utf-8'))) # find out the bigram term index
 
-					# print('Inverted Index:' + Inverted_Index)
+					print('Inverted Index:' + Inverted_Index)
 
 					if Inverted_Index in InvertedFile_Dict:
 						# Use Okapi/BM25 to normalize Document Length
@@ -254,7 +289,7 @@ def Bigram(queryTermsDict, query_id, Feedback):
 							rankingDict[docID][queryTermsIndex] = float(Bigram_TF * IDF * value)
 						queryTermsIndex += 1
 				else: # unigram:key[0]
-					Inverted_Index = str(Vocab_List.index(key[0]))+',-1' # find out the unigram term index
+					Inverted_Index = str(Vocab_List.index(key[0].encode('utf-8')))+',-1' # find out the unigram term index
 
 					if Inverted_Index in InvertedFile_Dict:
 						print('unigram key[0]: '+str(Inverted_Index))
@@ -275,8 +310,9 @@ def Bigram(queryTermsDict, query_id, Feedback):
 							rankingDict[docID][queryTermsIndex] = float(Bigram_TF * IDF * value)
 						queryTermsIndex += 1
 			else: # unigram:key[1]
-				if key[1] in Vocab_List:# unigram:key[1]
-					Inverted_Index = str(Vocab_List.index(key[1]))+',-1' # find out the unigram term index
+				print('unigram:key[1]')
+				if key[1].encode('utf-8') in Vocab_List:# unigram:key[1]
+					Inverted_Index = str(Vocab_List.index(key[1].encode('utf-8')))+',-1' # find out the unigram term index
 
 					if Inverted_Index in InvertedFile_Dict:
 						print('unigram key[1]: '+str(Inverted_Index))
@@ -297,10 +333,10 @@ def Bigram(queryTermsDict, query_id, Feedback):
 							rankingDict[docID][queryTermsIndex] = float(Bigram_TF * IDF * value)
 						queryTermsIndex += 1
 		else: # len(key)>2
-			if (key[0] in Vocab_List) and (key[1] in Vocab_List):
+			if (key[0].encode('utf-8') in Vocab_List) and (key[1].encode('utf-8') in Vocab_List):
 				print('first two word in Vocab_List')
-				if key[2] in Vocab_List:
-					Inverted_Index = str(Vocab_List.index(key[0]))+','+str(Vocab_List.index(key[1]))+','+str(Vocab_List.index(key[2]))
+				if key[2].encode('utf-8') in Vocab_List:
+					Inverted_Index = str(Vocab_List.index(key[0].encode('utf-8')))+','+str(Vocab_List.index(key[1].encode('utf-8')))+','+str(Vocab_List.index(key[2]))
 					if Inverted_Index in InvertedFile_Dict:
 						# Use Okapi/BM25 to normalize Document Length
 						print('in trigram & exist ' + Inverted_Index)
@@ -323,8 +359,8 @@ def Bigram(queryTermsDict, query_id, Feedback):
 								rankingDict[docID] = [0] * len(queryTermsDict)
 							rankingDict[docID][queryTermsIndex] = float(Bigram_TF * IDF * value)
 						queryTermsIndex += 1
-				if key[2] not in Vocab_List:
-					Inverted_Index = str(Vocab_List.index(key[0]))+','+str(Vocab_List.index(key[1]))+',-1' # find out the bigram term index
+				if key[2].encode('utf-8') not in Vocab_List:
+					Inverted_Index = str(Vocab_List.index(key[0].encode('utf-8')))+','+str(Vocab_List.index(key[1].encode('utf-8')))+',-1' # find out the bigram term index
 
 					# print('Inverted Index:' + Inverted_Index)
 
@@ -404,7 +440,8 @@ def Score_N_Sort(queryVector, rankingDict):
 	print('len(rankingDict)',len(rankingDict))
 	for docid, vector in rankingDict.items():
 
-		Score_Dict[docid]=np.inner(np.asarray(queryVector), np.asarray(rankingDict[docid]))
+		# Score_Dict[docid]=np.inner(np.asarray(queryVector), np.asarray(rankingDict[docid]))
+		Score_Dict[docid] = sum([x * y for x, y in zip(queryVector, rankingDict[docid])])
 		
 
 	# sort score from large to small
@@ -417,7 +454,7 @@ def Score_N_Sort(queryVector, rankingDict):
 
 	returnList = []
 	for index in range(len(sortedlistOfDoc)):
-		returnList.append(sortedlistOfDoc[index][0]);
+		returnList.append(sortedlistOfDoc[index][0])
 		if index == 99:
 			break
 	return returnList
@@ -481,9 +518,9 @@ def Cut_By_Jieba():
 
 def main():
 	parser = ArgumentParser()
-	parser.add_argument('-r', help = " if specified, turn on relevance feedback", type = bool, default = False)
+	parser.add_argument('-r', help = " if specified, turn on relevance feedback", action="store_true", default = False)
 	parser.add_argument('-i', help = " query-file", type = str)
-	parser.add_argument('-b', help = " best-result", type = bool, default = False)
+	parser.add_argument('-b', help = " best-result", action="store_true", default = False)
 	parser.add_argument('-o', help = " output ranked list : *.csv", type = str)
 	parser.add_argument('-m', help = " model-dir", type = str)
 	parser.add_argument('-d', help = " NTCIR-dir", type = str)
