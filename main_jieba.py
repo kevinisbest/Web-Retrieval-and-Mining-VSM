@@ -15,7 +15,7 @@ import xml.etree.cElementTree as ET
 
 #Okipi/BM25 Parmeters
 BM25_K = 0.7
-SLOPE = 0.6
+SLOPE = 0.2
 
 #Rocchio Relevance Feedback parameters
 ALPHA = 0.93
